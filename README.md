@@ -11,74 +11,73 @@ A state-of-the-art, production-ready pipeline for high-throughput virtual screen
 
 ## 🏗️ System Architecture
 
-A clean, modular architecture designed for high-throughput molecular simulations with real-time interactivity.
+The platform follows a **layered, modular architecture** designed for high-throughput molecular simulations with a responsive user experience.
 
+```mermaid
+graph TB
+    subgraph Frontend["🎨 FRONTEND LAYER<br/>(Next.js 16 + React 19)"]
+        UI["Dashboard & Charts<br/>(Recharts)"]
+        Viewer["3D Molecular Viewer<br/>(3Dmol.js)"]
+    end
+
+    subgraph API["🔌 API LAYER<br/>(FastAPI)"]
+        REST["REST API Gateway<br/>localhost:8000"]
+        Auth["JWT Authentication"]
+    end
+
+    subgraph Services["⚙️ SERVICES LAYER<br/>(Business Logic)"]
+        Screening["Screening Service<br/>Graph Building<br/>Ranking"]
+        Docking["Docking Service<br/>PDBQT Prep<br/>Pose Extraction"]
+    end
+
+    subgraph Compute["🧠 ML & COMPUTATIONAL<br/>LAYER"]
+        ML["Ensemble Models<br/>RF + XGB + MPNN + GIN"]
+        Vina["AutoDock Vina<br/>Binding Affinity"]
+        RDKit["RDKit<br/>Molecule Processing"]
+    end
+
+    subgraph Database["💾 DATABASE LAYER<br/>(SQLAlchemy ORM)"]
+        DB["PostgreSQL (Neon)<br/>Runs · Compounds<br/>Results · History"]
+    end
+
+    %% Connections
+    UI --> REST
+    Viewer --> REST
+    REST --> Auth
+    
+    Auth --> Screening
+    Auth --> Docking
+    
+    Screening --> ML
+    Screening --> RDKit
+    Docking --> Vina
+    Docking --> RDKit
+    
+    Screening --> DB
+    Docking --> DB
+
+    %% Styling
+    classDef frontend fill:#3b82f6,stroke:#1e40af,color:#fff,stroke-width:2px
+    classDef api fill:#6366f1,stroke:#4338ca,color:#fff,stroke-width:2px
+    classDef services fill:#10b981,stroke:#047857,color:#fff,stroke-width:2px
+    classDef compute fill:#f59e0b,stroke:#d97706,color:#fff,stroke-width:2px
+    classDef database fill:#8b5cf6,stroke:#6d28d9,color:#fff,stroke-width:2px
+
+    class Frontend,UI,Viewer frontend
+    class API,REST,Auth api
+    class Services,Screening,Docking services
+    class Compute,ML,Vina,RDKit compute
+    class Database,DB database
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                     FRONTEND LAYER                              │
-│         (Next.js + React + Tailwind + 3Dmol.js)                │
-├─────────────────────────────────────────────────────────────────┤
-│  • Screening Dashboard          • 3D Molecular Viewer           │
-│  • Docking Configuration        • Export Controls               │
-│  • Analytics & Charts           • Session Management            │
-└─────────────────────────────────────────────────────────────────┘
-                            ↕ HTTP/REST
-                      (JWT Authentication)
-┌─────────────────────────────────────────────────────────────────┐
-│              API GATEWAY (FastAPI + Pydantic)                   │
-│                  localhost:8000 - Async ASGI                   │
-├─────────────────────────────────────────────────────────────────┤
-│   /screening/*  │  /docking/*  │  /export/*  │  /auth/*       │
-└─────────────────────────────────────────────────────────────────┘
-                            ↕
-┌─────────────────────────────────────────────────────────────────┐
-│         PROCESSING & BUSINESS LOGIC LAYER                       │
-├──────────────────────────────────────────────────────────────────┤
-│  SCREENING SERVICE               DOCKING SERVICE                │
-│  ├─ SMILES parsing               ├─ Receptor preparation        │
-│  ├─ Graph building               ├─ Ligand conversion           │
-│  ├─ Ensemble prediction          ├─ AutoDock Vina runner        │
-│  └─ Ranking & filtering          └─ Pose extraction             │
-├──────────────────────────────────────────────────────────────────┤
-│                  AI/ML MODEL MODULE                              │
-│  Classical: Random Forest + XGBoost                              │
-│  Graph Neural Networks: MPNN + GIN (PyTorch Geometric)           │
-│  Meta-Learner: Ridge Regression (Ensemble Voting)                │
-└─────────────────────────────────────────────────────────────────┘
-                            ↕
-┌─────────────────────────────────────────────────────────────────┐
-│            DATABASE LAYER (SQLAlchemy ORM)                      │
-├─────────────────────────────────────────────────────────────────┤
-│  PostgreSQL / SQLite                                            │
-│  ├─ Users & Authentication       ├─ Screening Runs              │
-│  ├─ Compound Results             ├─ Docking Results             │
-│  └─ Model Performance & Feedback                                │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Data Flow Example:
-1. User uploads SMILES CSV → API validates and routes
-2. ScreeningService processes compounds → runs ensemble ML models
-3. Results ranked by pIC50 → stored in DB, displayed in dashboard
-4. User selects top compounds → submits for docking
-5. DockingService runs AutoDock Vina → generates poses
-6. 3D viewer animates poses → user can export results
-
-### Architecture Benefits:
-- **Separation of Concerns:** Each layer has single responsibility
-- **Scalability:** Async processing allows multiple concurrent requests
-- **Modularity:** Easy to swap ML models, add new docking engines
-- **Persistence:** Complete audit trail of all results
-- **Security:** JWT authentication, input validation at API layer
 
 ---
 
 ## 🧩 Module Descriptions
 
 ### 4.2.1 User Interface Module
-A responsive, high-performance web dashboard built with **Next.js 14** and **Tailwind CSS**. 
+A responsive, high-performance web dashboard built with **Next.js 16**, **React 19**, **TypeScript 5.7**, and **Tailwind CSS**. 
 - **Interactive 3D Viewer:** Integrated `3Dmol.js` for real-time exploration of protein-ligand docking poses with custom cartoon/stick rendering.
-- **Dynamic Analytics:** Real-time visualization of pIC50 distributions, confidence intervals, and Lipinski compliance using `Recharts`.
+- **Dynamic Analytics:** Real-time visualization of pIC50 distributions, confidence intervals, and Lipinski compliance using `Recharts` & `Lucide` icons.
 - **Session Management:** Secure user state handled via React Context API and JWT persistence.
 
 ### 4.2.2 API Gateway
@@ -100,10 +99,11 @@ A hybrid intelligence layer that combines the speed of Deep Learning with the ac
 - **Uncertainty Quantification:** Provides confidence scores for every prediction, highlighting potential "black swan" molecules.
 
 ### 4.2.5 Database Layer
-A robust persistence layer using **PostgreSQL** and **SQLAlchemy**.
-- **Relational Integrity:** Tracks complex relationships between Users, Screening Runs, and individual Docking Poses.
-- **Bulk Persistence:** Optimized for high-throughput writes, allowing for thousands of results to be saved per second.
-- **Audit Trail:** Maintains a full history of every discovery run for longitudinal analysis.
+A robust persistence layer using **PostgreSQL** (hosted on AWS Neon) with **SQLAlchemy ORM**.
+- **Cloud-Hosted:** PostgreSQL on Neon with SSL/TLS encryption for secure data transmission.
+- **Relational Integrity:** Tracks complex relationships between Users, Screening Runs, Docking Results, and individual Compound Predictions.
+- **Bulk Persistence:** Optimized for high-throughput writes, allowing thousands of screening results to be saved per batch.
+- **Audit Trail:** Maintains full history of every discovery run, model performance, and user feedback for longitudinal analysis.
 
 ---
 
@@ -118,10 +118,15 @@ A robust persistence layer using **PostgreSQL** and **SQLAlchemy**.
 
 ## 🛠️ Tech Stack
 
-- **Backend:** Python 3.10+, FastAPI, SQLAlchemy, Pydantic.
-- **Frontend:** TypeScript, Next.js, Tailwind CSS, 3Dmol.js, Lucide.
-- **Science:** RDKit, AutoDock Vina, PyTorch Geometric.
-- **DevOps:** PostgreSQL, JWT Auth, CSV/JSON Data Pipelines.
+| Layer | Technology | Version |
+|-------|-----------|---------|
+| **Frontend** | Next.js, React, TypeScript, Tailwind CSS | 16.2.4, 19, 5.7.3 |
+| **Backend** | FastAPI, Uvicorn, SQLAlchemy, Pydantic | 0.115+, 2.8+ |
+| **ML/AI** | PyTorch, PyTorch Geometric, scikit-learn, XGBoost | 2.3+, 2.5+, 1.5+, 2.1+ |
+| **Chemistry** | RDKit, Biopython, meeko | 2022.9.5+, 1.84+, 0.6+ |
+| **Docking** | AutoDock Vina | Latest |
+| **Database** | PostgreSQL (Neon), SQLAlchemy ORM | AWS Neon |
+| **UI/Viz** | 3Dmol.js, Recharts, Radix UI, Lucide | CDN, Latest |
 
 ---
 
