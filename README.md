@@ -11,38 +11,66 @@ A state-of-the-art, production-ready pipeline for high-throughput virtual screen
 
 ## 🏗️ System Architecture
 
-The platform is built on a distributed, modular architecture designed for high-performance molecular simulations and seamless user interaction.
+The platform is engineered with a modular, distributed architecture designed to handle high-throughput molecular simulations while providing a real-time, interactive user experience.
 
 ```mermaid
-graph TD
-    subgraph "User Interface Module (Next.js 14)"
-        UI[Frontend Dashboard]
-        Viewer[3D Molecular Viewer]
-        Analytics[Real-time Charts]
+graph TB
+    subgraph "Presentation Layer (Next.js 14)"
+        UI["Dashboard / Analytics"]
+        Viewer["3Dmol.js Viewer"]
+        Context["React Context API"]
     end
 
-    subgraph "API Gateway (FastAPI)"
-        GW[REST API Layer]
-        Auth[JWT Authentication]
-        Proxy[Request Orchestrator]
+    subgraph "API Gateway & Security (FastAPI)"
+        Gateway["REST API Layer"]
+        Auth["JWT / OAuth2"]
     end
 
-    subgraph "Processing & AI Engine"
-        PE[Docking Processing Engine]
-        Vina[AutoDock Vina Runner]
-        ML[AI/ML Model Module]
-        GNN[GNN Ensemble: GIN/MPNN]
+    subgraph "Orchestration & Business Logic"
+        ScreeningSvc["Screening Service"]
+        DockingSvc["Docking Service"]
+        AnalysisSvc["Analytics Engine"]
     end
 
-    subgraph "Database Layer (PostgreSQL)"
-        DB[(SQLAlchemy ORM)]
+    subgraph "Computational Engines"
+        Vina["AutoDock Vina Engine"]
+        ML["GNN Ensemble: GIN/MPNN"]
+        RDKit["RDKit Property Calc"]
     end
 
-    UI <--> GW
-    GW <--> PE
-    PE <--> ML
-    PE <--> Vina
-    GW <--> DB
+    subgraph "Data Persistence"
+        DB[("(SQLAlchemy ORM / PostgreSQL)")]
+    end
+
+    %% Interactions
+    UI --> Context
+    Context <--> Gateway
+    Gateway --> Auth
+    
+    Gateway --> ScreeningSvc
+    Gateway --> DockingSvc
+    Gateway --> AnalysisSvc
+
+    ScreeningSvc --> ML
+    ScreeningSvc --> RDKit
+    
+    DockingSvc --> Vina
+    DockingSvc --> RDKit
+
+    ScreeningSvc --> DB
+    DockingSvc --> DB
+    AnalysisSvc --> DB
+
+    %% Styling
+    classDef primary fill:#2563eb,stroke:#1d4ed8,color:#fff
+    classDef secondary fill:#475569,stroke:#334155,color:#fff
+    classDef computational fill:#059669,stroke:#047857,color:#fff
+    classDef database fill:#7c3aed,stroke:#6d28d9,color:#fff
+
+    class UI,Viewer,Context primary
+    class Gateway,Auth secondary
+    class ScreeningSvc,DockingSvc,AnalysisSvc,Vina,ML,RDKit computational
+    class DB database
 ```
 
 ---
