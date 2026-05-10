@@ -11,67 +11,65 @@ A state-of-the-art, production-ready pipeline for high-throughput virtual screen
 
 ## 🏗️ System Architecture
 
-The platform is engineered with a modular, distributed architecture designed to handle high-throughput molecular simulations while providing a real-time, interactive user experience.
+A clean, modular architecture designed for high-throughput molecular simulations with real-time interactivity.
 
-```mermaid
-graph TB
-    subgraph "Presentation Layer (Next.js 14)"
-        UI["Dashboard / Analytics"]
-        Viewer["3Dmol.js Viewer"]
-        Context["React Context API"]
-    end
-
-    subgraph "API Gateway & Security (FastAPI)"
-        Gateway["REST API Layer"]
-        Auth["JWT / OAuth2"]
-    end
-
-    subgraph "Orchestration & Business Logic"
-        ScreeningSvc["Screening Service"]
-        DockingSvc["Docking Service"]
-        AnalysisSvc["Analytics Engine"]
-    end
-
-    subgraph "Computational Engines"
-        Vina["AutoDock Vina Engine"]
-        ML["GNN Ensemble: GIN/MPNN"]
-        RDKit["RDKit Property Calc"]
-    end
-
-    subgraph "Data Persistence"
-        DB[("(SQLAlchemy ORM / PostgreSQL)")]
-    end
-
-    %% Interactions
-    UI --> Context
-    Context <--> Gateway
-    Gateway --> Auth
-    
-    Gateway --> ScreeningSvc
-    Gateway --> DockingSvc
-    Gateway --> AnalysisSvc
-
-    ScreeningSvc --> ML
-    ScreeningSvc --> RDKit
-    
-    DockingSvc --> Vina
-    DockingSvc --> RDKit
-
-    ScreeningSvc --> DB
-    DockingSvc --> DB
-    AnalysisSvc --> DB
-
-    %% Styling
-    classDef primary fill:#2563eb,stroke:#1d4ed8,color:#fff
-    classDef secondary fill:#475569,stroke:#334155,color:#fff
-    classDef computational fill:#059669,stroke:#047857,color:#fff
-    classDef database fill:#7c3aed,stroke:#6d28d9,color:#fff
-
-    class UI,Viewer,Context primary
-    class Gateway,Auth secondary
-    class ScreeningSvc,DockingSvc,AnalysisSvc,Vina,ML,RDKit computational
-    class DB database
 ```
+┌─────────────────────────────────────────────────────────────────┐
+│                     FRONTEND LAYER                              │
+│         (Next.js + React + Tailwind + 3Dmol.js)                │
+├─────────────────────────────────────────────────────────────────┤
+│  • Screening Dashboard          • 3D Molecular Viewer           │
+│  • Docking Configuration        • Export Controls               │
+│  • Analytics & Charts           • Session Management            │
+└─────────────────────────────────────────────────────────────────┘
+                            ↕ HTTP/REST
+                      (JWT Authentication)
+┌─────────────────────────────────────────────────────────────────┐
+│              API GATEWAY (FastAPI + Pydantic)                   │
+│                  localhost:8000 - Async ASGI                   │
+├─────────────────────────────────────────────────────────────────┤
+│   /screening/*  │  /docking/*  │  /export/*  │  /auth/*       │
+└─────────────────────────────────────────────────────────────────┘
+                            ↕
+┌─────────────────────────────────────────────────────────────────┐
+│         PROCESSING & BUSINESS LOGIC LAYER                       │
+├──────────────────────────────────────────────────────────────────┤
+│  SCREENING SERVICE               DOCKING SERVICE                │
+│  ├─ SMILES parsing               ├─ Receptor preparation        │
+│  ├─ Graph building               ├─ Ligand conversion           │
+│  ├─ Ensemble prediction          ├─ AutoDock Vina runner        │
+│  └─ Ranking & filtering          └─ Pose extraction             │
+├──────────────────────────────────────────────────────────────────┤
+│                  AI/ML MODEL MODULE                              │
+│  Classical: Random Forest + XGBoost                              │
+│  Graph Neural Networks: MPNN + GIN (PyTorch Geometric)           │
+│  Meta-Learner: Ridge Regression (Ensemble Voting)                │
+└─────────────────────────────────────────────────────────────────┘
+                            ↕
+┌─────────────────────────────────────────────────────────────────┐
+│            DATABASE LAYER (SQLAlchemy ORM)                      │
+├─────────────────────────────────────────────────────────────────┤
+│  PostgreSQL / SQLite                                            │
+│  ├─ Users & Authentication       ├─ Screening Runs              │
+│  ├─ Compound Results             ├─ Docking Results             │
+│  └─ Model Performance & Feedback                                │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Data Flow Example:
+1. User uploads SMILES CSV → API validates and routes
+2. ScreeningService processes compounds → runs ensemble ML models
+3. Results ranked by pIC50 → stored in DB, displayed in dashboard
+4. User selects top compounds → submits for docking
+5. DockingService runs AutoDock Vina → generates poses
+6. 3D viewer animates poses → user can export results
+
+### Architecture Benefits:
+- **Separation of Concerns:** Each layer has single responsibility
+- **Scalability:** Async processing allows multiple concurrent requests
+- **Modularity:** Easy to swap ML models, add new docking engines
+- **Persistence:** Complete audit trail of all results
+- **Security:** JWT authentication, input validation at API layer
 
 ---
 
