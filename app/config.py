@@ -14,7 +14,7 @@ class AppConfig:
     docking_dir: Path = data_dir / "docking"
     receptor_id: str = "1IEP"
     receptor_pdb_url: str = "https://files.rcsb.org/download/1IEP.pdb"
-    docking_box_center: tuple[float, float, float] = (15.0, 12.0, 21.0)
+    docking_box_center: tuple[float, float, float] = (15.0, 53.0, 18.0)
     docking_box_size: tuple[float, float, float] = (25.0, 25.0, 25.0)
     docking_exhaustiveness: int = 8
     docking_n_poses: int = 5

@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { Upload, Loader2, Filter } from 'lucide-react';
 import { useScreeningContext } from '@/lib/context/ScreeningContext';
-import { validateSmiles, submitScreening, uploadScreeningFile } from '@/lib/api/screening';
+import { useAuth } from '@/lib/context/AuthContext';
+import { validateSmiles, submitScreening, uploadScreeningFile, submitBatchScreening } from '@/lib/api/screening';
 
 // The actual base models the backend runs (from artifact_loader.py and hybrid_ensemble.py)
 const BACKEND_MODELS = ['RF', 'XGB', 'MPNN', 'GIN'] as const;
@@ -20,6 +21,7 @@ interface ScreeningInputProps {
 
 export function ScreeningInput({ onResultsReady }: ScreeningInputProps) {
   const { setSession } = useScreeningContext();
+  const { token } = useAuth();
   const [activeTab, setActiveTab] = useState<'single' | 'batch'>('single');
   const [singleSmiles, setSingleSmiles] = useState('');
   const [loading, setLoading] = useState(false);
@@ -68,7 +70,7 @@ export function ScreeningInput({ onResultsReady }: ScreeningInputProps) {
       // Lipinski/drug-likeness warnings shown in validation panel but screening proceeds
 
       // Submit to backend
-      const session = await submitScreening({ smiles: [singleSmiles] });
+      const session = await submitScreening({ smiles: [singleSmiles] }, token);
       setSession(session);
       onResultsReady();
     } catch (err) {
@@ -98,7 +100,7 @@ export function ScreeningInput({ onResultsReady }: ScreeningInputProps) {
       if (batchFile) {
         // Use multipart upload endpoint: POST /screening/upload
         // Accepts CSV with columns: compound_id (optional), smiles
-        session = await uploadScreeningFile(batchFile);
+        session = await uploadScreeningFile(batchFile, topN !== '' ? Number(topN) : null, filterLipinski, token);
       } else if (batchSmiles.trim()) {
         // Parse pasted SMILES (one per line) and send to POST /screening/batch
         const smilesList = batchSmiles
@@ -116,7 +118,7 @@ export function ScreeningInput({ onResultsReady }: ScreeningInputProps) {
           smiles: smilesList,
           filter_lipinski: filterLipinski,
           top_n: topN !== '' ? Number(topN) : null,
-        });
+        }, token);
       } else {
         setError('Please upload a CSV file or paste SMILES strings');
         setLoading(false);

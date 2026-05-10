@@ -69,6 +69,7 @@ class VinaRunner:
             return {
                 "best_affinity": best_affinity,
                 "energies": energies,
+                "pose_file": str(output_pdbqt)
             }
         except subprocess.TimeoutExpired:
             LOGGER.error("Vina docking timed out after 300 seconds")
@@ -87,9 +88,8 @@ class VinaRunner:
         try:
             with open(log_file, "r") as f:
                 for line in f:
-                    # Pattern: "   1       -7.2      0.000      0.000" or "   1            0          0          0"
-                    # Group 1 captures the affinity
-                    match = re.search(r"^\s+\d+\s+([-+]?(?:\d*\.\d+|\d+)(?:[eE][-+]?\d+)?)\s+", line)
+                    # More lenient regex to capture affinities like -7, -7.0, -7.22 etc.
+                    match = re.search(r"^\s+\d+\s+([-+]?\d*\.?\d+)", line)
                     if match:
                         energies.append(float(match.group(1)))
         except Exception as exc:

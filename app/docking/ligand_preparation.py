@@ -133,11 +133,18 @@ def sdf_to_pdbqt(sdf_path: Path, destination: Path) -> Path:
         lines = ["ROOT"]
 
         for atom in mol.GetAtoms():
-            position = conformer.GetAtomPosition(atom.GetIdx())
-            element = atom.GetSymbol().upper()
+            pos = conformer.GetAtomPosition(atom.GetIdx())
+            elem = atom.GetSymbol().upper()
+            # ad_type mapping similar to receptor preparation
+            ad_type = elem[:1] # Simple fallback
+            if elem == "CL": ad_type = "Cl"
+            if elem == "BR": ad_type = "Br"
+            if elem == "FE": ad_type = "Fe"
+            
+            # PDB columns: 7-11 serial, 13-16 name, 17-20 resName, 22 chain, 23-26 resSeq, 31-38 x, 39-46 y, 47-54 z, 55-60 occ, 61-66 temp, 71-76 charge, 79-80 element
             line = (
-                f"ATOM  {atom.GetIdx() + 1:5d} {element:<4s} LIG A{1:4d}"
-                f"    {position.x:8.3f}{position.y:8.3f}{position.z:8.3f}  {0.0:6.3f} {element:>2s}"
+                f"ATOM  {atom.GetIdx()+1:5d} {elem:<4s} LIG A   1    "
+                f"{pos.x:8.3f}{pos.y:8.3f}{pos.z:8.3f}  1.00  0.00    +0.000 {ad_type}"
             )
             lines.append(line)
 
@@ -145,7 +152,7 @@ def sdf_to_pdbqt(sdf_path: Path, destination: Path) -> Path:
         lines.append("TORSDOF 0")
 
         destination.write_text("\n".join(lines) + "\n", encoding="utf-8")
-        LOGGER.debug(f"Converted SDF to PDBQT via manual conversion: {destination}")
+        LOGGER.info(f"Converted SDF to PDBQT via manual conversion: {destination}")
         return destination
 
     except Exception as e:

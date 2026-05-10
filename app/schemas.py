@@ -41,6 +41,7 @@ class ExportRequest(BaseModel):
 
 
 class MoleculePrediction(BaseModel):
+    compound_id: str | None = None
     smiles: str
     canonical_smiles: str | None = None
     valid: bool = True
@@ -64,6 +65,7 @@ class ScreeningResponse(BaseModel):
 
 
 class DockingResult(BaseModel):
+    compound_id: str | None = None
     smiles: str
     affinity: float | None = None
     pose_count: int | None = None

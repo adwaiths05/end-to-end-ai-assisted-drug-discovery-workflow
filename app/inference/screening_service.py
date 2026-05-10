@@ -25,20 +25,21 @@ class ScreeningService:
         self.artifacts = artifacts or load_artifacts()
         self.pipeline = ClassicalFeaturePipeline(self.artifacts.preproc_vt, self.artifacts.preproc_scaler, self.artifacts.preproc_to_drop)
 
-    def _prepare_inputs(self, smiles_list: list[str]) -> tuple[list[dict], list[str]]:
+    def _prepare_inputs(self, smiles_list: list[str], compound_ids: list[str] | None = None) -> tuple[list[dict], list[str]]:
         records = []
         valid_smiles = []
-        for smiles in smiles_list:
+        for i, smiles in enumerate(smiles_list):
+            comp_id = compound_ids[i] if compound_ids and i < len(compound_ids) else f"ligand_{i}"
             if not is_valid_smiles(smiles):
-                records.append({"smiles": smiles, "valid": False, "canonical_smiles": None})
+                records.append({"smiles": smiles, "valid": False, "canonical_smiles": None, "compound_id": comp_id})
                 continue
             standardized = standardize_molecule(smiles) or smiles
             valid_smiles.append(standardized)
-            records.append({"smiles": smiles, "valid": True, "canonical_smiles": standardized})
+            records.append({"smiles": smiles, "valid": True, "canonical_smiles": standardized, "compound_id": comp_id})
         return records, valid_smiles
 
-    def screen_smiles(self, smiles_list: list[str], top_n: int | None = None) -> list[dict]:
-        records, valid_smiles = self._prepare_inputs(smiles_list)
+    def screen_smiles(self, smiles_list: list[str], top_n: int | None = None, compound_ids: list[str] | None = None) -> list[dict]:
+        records, valid_smiles = self._prepare_inputs(smiles_list, compound_ids)
         if not valid_smiles:
             return records
 
@@ -95,6 +96,7 @@ class ScreeningService:
         result_frame = pd.DataFrame(
             {
                 "smiles": valid_smiles,
+                "compound_id": [r["compound_id"] for r in records if r["valid"]],
                 "predicted_pic50": final_preds,
                 "uncertainty": unc,
                 "confidence": conf,
@@ -111,7 +113,20 @@ class ScreeningService:
         for row in result_frame.to_dict(orient="records"):
             row["valid"] = True
             row["status"] = "success"
-            row["metadata"] = inspect_molecule(row["smiles"], {"ensemble_mode": ensemble.active_mode})
+            # Use inspect_molecule once to get all properties
+            mol_data = inspect_molecule(row["smiles"], {"ensemble_mode": ensemble.active_mode})
+            # Map molecular properties to the "metadata" format expected by the frontend
+            row["metadata"] = {
+                "mw": mol_data.get("molecular_weight", 0),
+                "logp": mol_data.get("logp", 0),
+                "hbd": mol_data.get("hbd", 0),
+                "hba": mol_data.get("hba", 0),
+                "rotatable_bonds": mol_data.get("rotatable_bonds", 0),
+                "tpsa": mol_data.get("tpsa", 0),
+                "ensemble_mode": ensemble.active_mode
+            }
+            # Keep original mol_properties for DB storage
+            row["mol_properties"] = mol_data
             model_predictions = {}
             for key in ("rf", "xgb", "mpnn", "gin"):
                 column = f"{key}_pred"
@@ -129,8 +144,9 @@ class ScreeningService:
                 record.update({"status": "invalid_smiles", "predicted_pic50": None, "confidence": None, "uncertainty": None, "agreement": None})
                 invalid_records.append(record)
 
-        combined = valid_records + invalid_records
         if top_n is not None:
-            combined = valid_records[:top_n] + invalid_records
-        return combined
+            # Top-N mode should return exactly N ranked hits, not extra invalid rows.
+            return valid_records[:top_n]
+
+        return valid_records + invalid_records
 

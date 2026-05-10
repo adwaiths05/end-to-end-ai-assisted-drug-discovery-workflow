@@ -55,7 +55,7 @@ class DockingService:
             LOGGER.info(f"Auto-detected binding box center: {center}")
         return center
 
-    def dock_smiles(self, smiles_list: list[str], predictions: list[float] | None = None) -> list[dict]:
+    def dock_smiles(self, smiles_list: list[str], predictions: list[float] | None = None, compound_ids: list[str] | None = None) -> list[dict]:
         raw_pdb = self.work_dir / f"{self.config.receptor_id}.pdb"
         receptor = self.prepare_receptor()
 
@@ -78,32 +78,51 @@ class DockingService:
         )
         rows = []
 
+        from app.docking.interaction_analysis import InteractionAnalyzer
         for index, smiles in enumerate(smiles_list):
-            sdf_path = self.work_dir / f"ligand_{index}.sdf"
-            pdbqt_path = self.work_dir / f"ligand_{index}.pdbqt"
+            comp_id = compound_ids[index] if compound_ids and index < len(compound_ids) else f"ligand_{index}"
+            sdf_path = self.work_dir / f"{comp_id}.sdf"
+            pdbqt_path = self.work_dir / f"{comp_id}.pdbqt"
             try:
                 sdf = smiles_to_sdf(smiles, sdf_path)
                 if sdf is None:
                     raise ValueError("invalid smiles")
                 sdf_to_pdbqt(sdf, pdbqt_path)
                 result = runner.dock(pdbqt_path)
+                
+                # Perform real-time interaction analysis for the best pose
+                interactions = {}
+                try:
+                    analyzer = InteractionAnalyzer(receptor)
+                    interactions = analyzer.analyze_pose(
+                        ligand_id=comp_id,
+                        smiles=smiles,
+                        affinity=result.get("best_affinity", 0),
+                        pose_pdbqt=Path(result["pose_file"])
+                    )
+                except Exception as int_exc:
+                    LOGGER.warning(f"Interaction analysis failed for {comp_id}: {int_exc}")
+
                 rows.append(
                     {
+                        "compound_id": comp_id,
                         "smiles": smiles,
                         "predicted_pic50": predictions[index] if predictions and index < len(predictions) else None,
-                        "vina_affinity": result.get("best_affinity"),
+                        "affinity": result.get("best_affinity"),
                         "pose_count": self.config.n_poses,
                         "status": "success",
+                        "interactions": interactions,
                         "details": result,
                     }
                 )
             except Exception as exc:
-                LOGGER.exception("Docking failed for molecule %s", index)
+                LOGGER.exception("Docking failed for molecule %s", comp_id)
                 rows.append(
                     {
+                        "compound_id": comp_id,
                         "smiles": smiles,
                         "predicted_pic50": predictions[index] if predictions and index < len(predictions) else None,
-                        "vina_affinity": None,
+                        "affinity": None,
                         "pose_count": 0,
                         "status": f"failed: {exc}",
                         "details": {},

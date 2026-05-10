@@ -49,3 +49,41 @@ def get_user_dashboard_stats(db: Session, user_id: str):
         "best_pic50": best_pic50,
         "avg_confidence": avg_conf
     }
+def create_screening_run(db: Session, user_id: str, results: list[dict], ensemble_mode: str):
+    import uuid
+    run_id = str(uuid.uuid4())
+    
+    valid_results = [r for r in results if r.get("valid")]
+    avg_pic50 = sum(r.get("predicted_pic50") or 0 for r in valid_results) / len(valid_results) if valid_results else 0
+    avg_conf = sum(r.get("confidence") or 0 for r in valid_results) / len(valid_results) if valid_results else 0
+    
+    db_run = ScreeningRun(
+        id=run_id,
+        user_id=user_id,
+        active_ensemble=ensemble_mode,
+        total_compounds=len(results),
+        valid_compounds=len(valid_results),
+        avg_pic50=avg_pic50,
+        avg_confidence=avg_conf
+    )
+    db.add(db_run)
+    
+    # Bulk insert compounds
+    for r in results:
+        comp = CompoundResult(
+            id=str(uuid.uuid4()),
+            run_id=run_id,
+            smiles=r["smiles"],
+            compound_id=r.get("compound_id"),
+            predicted_pic50=r.get("predicted_pic50"),
+            confidence=r.get("confidence"),
+            uncertainty=r.get("uncertainty"),
+            agreement=r.get("agreement"),
+            model_predictions=r.get("model_predictions", {}),
+            mol_properties=r.get("mol_properties", {})
+        )
+        db.add(comp)
+    
+    db.commit()
+    db.refresh(db_run)
+    return db_run

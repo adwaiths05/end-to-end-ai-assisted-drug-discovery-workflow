@@ -8,9 +8,11 @@ import { DockingProgress } from '@/components/pages/DockingProgress';
 import { DockingResults } from '@/components/pages/DockingResults';
 import { submitDockingJob } from '@/lib/api/docking';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/context/AuthContext';
 
 export default function DockingPage() {
   const router = useRouter();
+  const { token } = useAuth();
   const { session: screeningSession } = useScreeningContext();
   const { job, setJob, clearJob } = useDockingContext();
   
@@ -57,9 +59,10 @@ export default function DockingPage() {
       const newJob = await submitDockingJob({
         smiles: selectedCompounds.map(c => c.canonical_smiles || c.smiles),
         predicted_pic50: selectedCompounds.map(c => c.predicted_pic50 ?? 0),
-        compound_ids: selectedCompounds.map((c, i) => c.compoundId || `lig_${String(i).padStart(3, '0')}`),
+        // Force generic names ligand_0, ligand_1... as requested by user
+        compound_ids: selectedCompounds.map((_, i) => `ligand_${i}`),
         uiParameters: parameters,
-      });
+      }, token);
       setJob(newJob);
     } catch (err) {
       console.error('[docking] Submission error:', err);

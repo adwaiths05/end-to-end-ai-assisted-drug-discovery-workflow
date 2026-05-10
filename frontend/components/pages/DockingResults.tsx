@@ -10,6 +10,7 @@ interface DockingResultsProps {
 }
 
 export function DockingResults({ results }: DockingResultsProps) {
+  const [selectedLigandIndex, setSelectedLigandIndex] = useState(0);
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
 
   if (results.length === 0) {
@@ -25,9 +26,9 @@ export function DockingResults({ results }: DockingResultsProps) {
     affinity: r.affinity || 0
   }));
 
-  // Chart 2: Pose Energy Line Chart (Top Hit)
-  const topHit = sorted[0];
-  const poseData = topHit?.details?.energies?.map((energy: number, index: number) => ({
+  // Chart 2: Pose Energy Line Chart (Selected Ligand)
+  const selectedLigand = sorted[selectedLigandIndex];
+  const poseData = selectedLigand?.details?.energies?.map((energy: number, index: number) => ({
     pose: `Pose ${index + 1}`,
     affinity: energy
   })) || [];
@@ -50,9 +51,20 @@ export function DockingResults({ results }: DockingResultsProps) {
           </ResponsiveContainer>
         </div>
 
-        {/* Chart 2: Pose Energy Line (Top Hit) */}
+        {/* Chart 2: Pose Energy Line (Dynamic Selection) */}
         <div className="rounded-lg border border-border bg-card p-6">
-          <h3 className="mb-4 text-sm font-semibold text-foreground">Pose Energies ({topHit?.compoundId || 'Top Hit'})</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-foreground">Pose Energies ({selectedLigand?.compoundId || 'Selected'})</h3>
+            <select 
+              className="bg-muted border border-border rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-primary"
+              value={selectedLigandIndex}
+              onChange={(e) => setSelectedLigandIndex(parseInt(e.target.value))}
+            >
+              {sorted.slice(0, 10).map((r, i) => (
+                <option key={i} value={i}>{r.compoundId || `Rank ${i+1}`}</option>
+              ))}
+            </select>
+          </div>
           <ResponsiveContainer width="100%" height={250}>
             <LineChart data={poseData}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />

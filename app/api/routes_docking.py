@@ -97,7 +97,7 @@ def run_docking(request: DockingRequest):
     service = DockingService(config=config)
     
     try:
-        rows = service.dock_smiles(request.smiles, predictions=request.predicted_pic50)
+        rows = service.dock_smiles(request.smiles, predictions=request.predicted_pic50, compound_ids=request.compound_ids)
     except Exception as exc:
         from fastapi import HTTPException
 

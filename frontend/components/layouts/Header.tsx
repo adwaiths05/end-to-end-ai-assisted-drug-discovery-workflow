@@ -27,50 +27,15 @@ export function Header() {
 
           {/* Navigation */}
           <nav className="hidden flex-1 items-center justify-center gap-8 md:flex">
-            <Link
-              href="/"
-              className={`text-sm font-medium transition-colors ${
-                isActive('/') ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Home
-            </Link>
-            
-            {user && (
-              <>
-                <Link
-                  href="/dashboard"
-                  className={`text-sm font-medium transition-colors ${
-                    isActive('/dashboard') ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  Dashboard
-                </Link>
-                <Link
-                  href="/screening"
-                  className={`text-sm font-medium transition-colors ${
-                    isActive('/screening') ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  Screening
-                </Link>
-                <Link
-                  href="/docking"
-                  className={`text-sm font-medium transition-colors ${
-                    isActive('/docking') ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  Docking
-                </Link>
-                <Link
-                  href="/analysis"
-                  className={`text-sm font-medium transition-colors ${
-                    isActive('/analysis') ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  Analysis
-                </Link>
-              </>
+            {!user && (
+              <Link
+                href="/"
+                className={`text-sm font-medium transition-colors ${
+                  isActive('/') ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Home
+              </Link>
             )}
           </nav>
 

@@ -130,8 +130,8 @@ def get_ligand_center_from_pdb(pdb_path: Path, hetatm_name: str | None = None) -
 
                 res_name = line[17:20].strip()
 
-                # Skip water
-                if res_name == "HOH":
+                # Skip water and common ions
+                if res_name in ["HOH", "CL", "NA", "MG", "ZN", "CA", "SO4"]:
                     continue
 
                 # If specific name given, filter by it

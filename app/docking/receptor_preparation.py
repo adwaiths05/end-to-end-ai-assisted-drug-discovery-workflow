@@ -192,13 +192,15 @@ def convert_pdb_to_pdbqt(source: Path, destination: Path) -> Path:
     lines = []
     for i, atom in enumerate(all_atoms, 1):
         elem = atom["element"].upper()
-        ad_type = AD_ATOM_MAP.get(elem, "C")
-        name = atom["name"].ljust(4)[:4]
-        res = atom["res_name"].ljust(3)[:3]
+        ad_type = AD_ATOM_MAP.get(elem, elem[:1])
+        # Precisely format according to PDBQT standards
+        # Columns: 7-11 Serial, 13-16 Name, 18-20 ResName, 22 Chain, 23-26 ResSeq, 31-38 X, 39-46 Y, 47-54 Z, 71-76 Charge, 79-80 Type
+        name = atom["name"].ljust(4)
+        res = atom["res_name"].ljust(3)
         line = (
-            f"ATOM  {i:5d} {name} {res} {atom['chain']}{atom['res_seq']:4d}    "
+            f"ATOM  {i:5d} {name:4s} {res:3s} {atom['chain']:1s}{atom['res_seq']:4d}    "
             f"{atom['x']:8.3f}{atom['y']:8.3f}{atom['z']:8.3f}"
-            f"  1.00  0.00    {0.0:6.3f} {ad_type}\n"
+            f"  1.00  0.00    +0.000 {ad_type:<2s}\n"
         )
         lines.append(line)
 
