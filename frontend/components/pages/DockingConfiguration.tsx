@@ -28,12 +28,12 @@ export function DockingConfiguration({ topHits, onSubmit, isLoading }: DockingCo
   const [cpuThreads, setCpuThreads] = useState(4);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [gridSpacing, setGridSpacing] = useState(0.375);
-  const [searchSpaceX, setSearchSpaceX] = useState(20);
-  const [searchSpaceY, setSearchSpaceY] = useState(20);
-  const [searchSpaceZ, setSearchSpaceZ] = useState(20);
+  const [searchSpaceX, setSearchSpaceX] = useState(25);
+  const [searchSpaceY, setSearchSpaceY] = useState(25);
+  const [searchSpaceZ, setSearchSpaceZ] = useState(25);
   const [centerX, setCenterX] = useState(15.0);
-  const [centerY, setCenterY] = useState(12.0);
-  const [centerZ, setCenterZ] = useState(21.0);
+  const [centerY, setCenterY] = useState(53.0);
+  const [centerZ, setCenterZ] = useState(18.0);
 
   const handleCompoundToggle = (index: string) => {
     setSelectedCompounds((prev) => {

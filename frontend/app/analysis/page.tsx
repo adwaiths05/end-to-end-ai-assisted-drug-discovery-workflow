@@ -5,7 +5,7 @@ import { useScreeningContext } from '@/lib/context/ScreeningContext';
 import { useDockingContext } from '@/lib/context/DockingContext';
 import { useAuth } from '@/lib/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ScatterChart, Scatter, LineChart, Line, BoxPlot } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ScatterChart, Scatter, LineChart, Line } from 'recharts';
 import { Download, Search } from 'lucide-react';
 import { MolecularViewer3D } from '@/components/analysis/MolecularViewer3D';
 
@@ -14,23 +14,25 @@ export default function AnalysisPage() {
   const { session: screeningSession } = useScreeningContext();
   const { job: dockingJob } = useDockingContext();
   const { token } = useAuth();
-  const [activeTab, setActiveTab] = useState<'rankings' | '3d' | 'comparison' | 'history'>('rankings');
+  const [activeTab, setActiveTab] = useState<'rankings' | '3d' | 'comparison' | 'poses' | 'history'>('rankings');
   const [historyData, setHistoryData] = useState<any[]>([]);
   const [selectedCompoundId, setSelectedCompoundId] = useState<string | null>(null);
+  const [selectedPoseCompound, setSelectedPoseCompound] = useState<string | null>(null);
 
   const downloadCSV = () => {
     // Only export compounds that were actually submitted for docking
-    const dockedResults = combinedResults.filter(r => r.bindingAffinity !== undefined || r.poseCount > 0);
+    const dockedResults = combinedResults.filter(r => r.bestEnergyKcal !== undefined || r.poseCount > 0);
     
     if (!dockedResults.length) return;
     
-    const headers = ['Rank', 'CompoundId', 'SMILES', 'Consensus Score', 'Docking Affinity (kcal/mol)', 'Pose Count'];
+    const headers = ['Rank', 'CompoundId', 'SMILES', 'Consensus Score', 'Best Energy (kcal/mol)', 'Binding Affinity Kd (μM)', 'Pose Count'];
     const rows = dockedResults.map((r, i) => [
       i + 1,
       `"${r.compoundId}"`,
       `"${r.smiles}"`,
       r.predicted_pic50?.toFixed(4) || 'N/A',
-      r.bindingAffinity?.toFixed(2) || 'N/A',
+      r.bestEnergyKcal?.toFixed(2) || 'N/A',
+      r.bindingAffinityKd?.toFixed(4) || 'N/A',
       r.poseCount || 0
     ]);
     
@@ -85,6 +87,7 @@ export default function AnalysisPage() {
     );
   }
 
+  // Merge screening + docking results
   const combinedResults = screeningSession.results.map((screening, idx) => {
     const docking = dockingJob.results.find(d => 
       d.smiles.trim().toLowerCase() === screening.smiles.trim().toLowerCase() ||
@@ -93,26 +96,57 @@ export default function AnalysisPage() {
     return { 
       ...screening, 
       compoundId: docking?.compoundId || (screening as any).compound_id || screening.compoundId || `ligand_${idx}`,
-      bindingAffinity: docking?.affinity,
+      bestEnergyKcal: docking?.bestEnergyKcal ?? null,       // raw Vina energy (kcal/mol)
+      bindingAffinityKd: docking?.affinity ?? null,           // Kd in μM from Kd = exp(ΔG/RT)
+      poseEnergies: docking?.poseEnergies ?? [],              // all pose energies (kcal/mol)
       poseCount: docking?.poseCount || 0,
       interactions: docking?.interactions
     };
-  }).sort((a, b) => (a.bindingAffinity ?? 0) - (b.bindingAffinity ?? 0));
+  }).sort((a, b) => (a.bestEnergyKcal ?? 0) - (b.bestEnergyKcal ?? 0)); // sort by energy (most negative first = best)
 
-  const chartData = combinedResults.slice(0, 10).map((r, idx) => ({ name: r.compoundId || `Compound ${idx + 1}`, consensus: r.predicted_pic50, affinity: r.bindingAffinity || 0 }));
-  const scatterData = combinedResults.map((r, idx) => ({ x: r.predicted_pic50, y: r.bindingAffinity || 0, name: r.compoundId || `Compound ${idx + 1}` }));
+  // Chart data: best affinity (Kd μM) per compound
+  const affinityChartData = combinedResults.slice(0, 10).map((r, idx) => ({
+    name: r.compoundId || `Compound ${idx + 1}`,
+    kd: r.bindingAffinityKd ?? 0,
+    energy: r.bestEnergyKcal ?? 0,
+  }));
+
+  // Scatter: AI pIC50 vs Vina binding energy
+  const scatterData = combinedResults.map((r, idx) => ({
+    x: r.predicted_pic50,
+    y: r.bestEnergyKcal || 0,
+    name: r.compoundId || `Compound ${idx + 1}`
+  }));
+
+  // Pose energy data for the selected compound
+  const selectedPoseResult = combinedResults.find(r => r.compoundId === selectedPoseCompound) || combinedResults[0];
+  const poseEnergyData = (selectedPoseResult?.poseEnergies || []).map((e: number, i: number) => ({
+    pose: `Pose ${i + 1}`,
+    energy: e,
+  }));
 
   useEffect(() => {
     if (combinedResults.length > 0 && !selectedCompoundId) {
       setSelectedCompoundId(combinedResults[0].compoundId);
     }
-  }, [combinedResults, selectedCompoundId]);
+    if (combinedResults.length > 0 && !selectedPoseCompound) {
+      setSelectedPoseCompound(combinedResults[0].compoundId);
+    }
+  }, [combinedResults, selectedCompoundId, selectedPoseCompound]);
+
+  // Format Kd for display
+  const formatKd = (kd: number | null) => {
+    if (kd == null) return 'N/A';
+    if (kd < 0.001) return `${(kd * 1e6).toFixed(1)} pM`;
+    if (kd < 1) return `${(kd * 1e3).toFixed(1)} nM`;
+    return `${kd.toFixed(2)} μM`;
+  };
 
   return (
     <div className="container mx-auto px-4 py-12">
       <div className="max-w-6xl mx-auto space-y-8">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <h1 className="text-4xl font-bold text-foreground">Results & Analysis</h1>
+          <h1 className="text-4xl font-bold text-foreground">Results &amp; Analysis</h1>
           <button 
             onClick={downloadCSV}
             className="flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 font-semibold text-primary-foreground shadow-lg hover:scale-105 transition-all"
@@ -124,15 +158,16 @@ export default function AnalysisPage() {
 
         <div className="grid gap-4 sm:grid-cols-4">
           <div className="rounded-lg border border-border bg-card p-4"><p className="text-sm text-muted-foreground">Total Compounds</p><p className="text-2xl font-bold text-primary">{combinedResults.length}</p></div>
-          <div className="rounded-lg border border-border bg-card p-4"><p className="text-sm text-muted-foreground">Avg Affinity</p><p className="text-2xl font-bold text-primary">{(combinedResults.reduce((s, r) => s + (r.bindingAffinity || 0), 0) / combinedResults.length).toFixed(2)}</p></div>
-          <div className="rounded-lg border border-border bg-card p-4"><p className="text-sm text-muted-foreground">Best Hit</p><p className="text-2xl font-bold text-primary">{combinedResults[0]?.bindingAffinity?.toFixed(2) || 'N/A'}</p></div>
+          <div className="rounded-lg border border-border bg-card p-4"><p className="text-sm text-muted-foreground">Avg Energy (kcal/mol)</p><p className="text-2xl font-bold text-primary">{(combinedResults.reduce((s, r) => s + (r.bestEnergyKcal || 0), 0) / combinedResults.length).toFixed(2)}</p></div>
+          <div className="rounded-lg border border-border bg-card p-4"><p className="text-sm text-muted-foreground">Best Energy</p><p className="text-2xl font-bold text-primary">{combinedResults[0]?.bestEnergyKcal?.toFixed(2) || 'N/A'} kcal/mol</p></div>
+          <div className="rounded-lg border border-border bg-card p-4"><p className="text-sm text-muted-foreground">Best Kd</p><p className="text-2xl font-bold text-primary">{formatKd(combinedResults[0]?.bindingAffinityKd)}</p></div>
         </div>
 
         <div className="rounded-lg border border-border bg-card overflow-hidden">
           <div className="flex gap-0 border-b border-border overflow-x-auto">
-            {['rankings', '3d', 'comparison', 'history'].map(id => (
+            {['rankings', '3d', 'comparison', 'poses', 'history'].map(id => (
               <button key={id} onClick={() => setActiveTab(id as any)} className={`px-4 py-3 text-sm font-medium transition-colors ${activeTab === id ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground hover:text-foreground'}`}>
-                {id.charAt(0).toUpperCase() + id.slice(1)}
+                {id === 'poses' ? 'Pose Energies' : id.charAt(0).toUpperCase() + id.slice(1)}
               </button>
             ))}
           </div>
@@ -163,7 +198,7 @@ export default function AnalysisPage() {
             {activeTab === 'rankings' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between px-4 py-2 bg-muted/50 rounded-lg">
-                  <span className="text-sm text-muted-foreground font-medium">Top 5 Discovery Candidates (Consensus Ranked)</span>
+                  <span className="text-sm text-muted-foreground font-medium">Top 5 Discovery Candidates (Ranked by Vina Binding Energy)</span>
                 </div>
                 <table className="w-full text-sm">
                   <thead>
@@ -171,7 +206,8 @@ export default function AnalysisPage() {
                       <th className="px-4 py-3 text-left">Rank</th>
                       <th className="px-4 py-3 text-left">Compound Identifier</th>
                       <th className="px-4 py-3 text-right">pIC50 (AI)</th>
-                      <th className="px-4 py-3 text-right">Affinity (Physics)</th>
+                      <th className="px-4 py-3 text-right">ΔG (kcal/mol)</th>
+                      <th className="px-4 py-3 text-right">Kd (μM)</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -180,27 +216,100 @@ export default function AnalysisPage() {
                         <td className="px-4 py-3 font-bold text-primary">{idx + 1}</td>
                         <td className="px-4 py-3 font-mono text-xs">{r.compoundId}</td>
                         <td className="px-4 py-3 text-right font-medium">{r.predicted_pic50?.toFixed(3)}</td>
-                        <td className="px-4 py-3 text-right text-primary font-bold">{r.bindingAffinity?.toFixed(2)} kcal/mol</td>
+                        <td className="px-4 py-3 text-right font-bold">{r.bestEnergyKcal?.toFixed(2) ?? 'N/A'}</td>
+                        <td className="px-4 py-3 text-right text-primary font-bold">{formatKd(r.bindingAffinityKd)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+
+                {/* Best Affinity (Kd) Bar Chart */}
+                <div className="mt-6">
+                  <h4 className="text-sm font-semibold mb-3">Best Binding Affinity (Kd) — Top 10</h4>
+                  <p className="text-xs text-muted-foreground mb-4">Lower Kd = stronger binding. Computed from Vina energy via Kd = exp(ΔG / RT), R = 1.987 cal/(mol·K), T = 298.15 K</p>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={affinityChartData} margin={{ top: 10, right: 20, bottom: 20, left: 20 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                      <XAxis dataKey="name" stroke="var(--color-muted-foreground)" tick={{ fontSize: 10 }} angle={-30} textAnchor="end" height={60} />
+                      <YAxis stroke="var(--color-muted-foreground)" label={{ value: 'Kd (μM)', angle: -90, position: 'insideLeft' }} />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: 'var(--color-card)', borderColor: 'var(--color-border)' }} 
+                        formatter={(value: number, name: string) => {
+                          if (name === 'kd') return [`${value.toFixed(4)} μM`, 'Kd'];
+                          return [value, name];
+                        }}
+                      />
+                      <Bar dataKey="kd" fill="var(--color-primary)" name="kd" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
             )}
 
+            {activeTab === 'poses' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold">Pose Energies (AutoDock Vina)</h3>
+                    <p className="text-xs text-muted-foreground">Binding energies (kcal/mol) for each docked pose from AutoDock Vina. More negative = stronger binding.</p>
+                  </div>
+                  <select
+                    className="bg-muted border border-border rounded-md px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-primary"
+                    value={selectedPoseCompound || ''}
+                    onChange={(e) => setSelectedPoseCompound(e.target.value)}
+                  >
+                    {combinedResults.filter(r => r.poseEnergies.length > 0).map((r, i) => (
+                      <option key={i} value={r.compoundId}>{r.compoundId} ({r.poseEnergies.length} poses)</option>
+                    ))}
+                  </select>
+                </div>
 
+                {poseEnergyData.length > 0 ? (
+                  <>
+                    <ResponsiveContainer width="100%" height={350}>
+                      <BarChart data={poseEnergyData} margin={{ top: 10, right: 20, bottom: 20, left: 20 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                        <XAxis dataKey="pose" stroke="var(--color-muted-foreground)" />
+                        <YAxis stroke="var(--color-muted-foreground)" label={{ value: 'Energy (kcal/mol)', angle: -90, position: 'insideLeft' }} />
+                        <Tooltip 
+                          contentStyle={{ backgroundColor: 'var(--color-card)', borderColor: 'var(--color-border)' }} 
+                          formatter={(value: number) => [`${value.toFixed(2)} kcal/mol`, 'Binding Energy']}
+                        />
+                        <Bar dataKey="energy" fill="var(--color-chart-2)" name="Binding Energy" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                    <div className="grid grid-cols-3 gap-4 mt-2">
+                      <div className="rounded-lg border border-border bg-muted/30 p-3 text-center">
+                        <p className="text-xs text-muted-foreground">Best Pose</p>
+                        <p className="text-lg font-bold text-primary">{Math.min(...(selectedPoseResult?.poseEnergies || [0])).toFixed(2)} kcal/mol</p>
+                      </div>
+                      <div className="rounded-lg border border-border bg-muted/30 p-3 text-center">
+                        <p className="text-xs text-muted-foreground">Worst Pose</p>
+                        <p className="text-lg font-bold">{Math.max(...(selectedPoseResult?.poseEnergies || [0])).toFixed(2)} kcal/mol</p>
+                      </div>
+                      <div className="rounded-lg border border-border bg-muted/30 p-3 text-center">
+                        <p className="text-xs text-muted-foreground">Energy Spread</p>
+                        <p className="text-lg font-bold">{((Math.max(...(selectedPoseResult?.poseEnergies || [0]))) - (Math.min(...(selectedPoseResult?.poseEnergies || [0])))).toFixed(2)} kcal/mol</p>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex h-[300px] items-center justify-center text-muted-foreground">No pose energy data available for this compound</div>
+                )}
+              </div>
+            )}
 
             {activeTab === 'comparison' && (
               <div className="space-y-6">
                 <div className="bg-muted/30 p-4 rounded-lg border border-border">
                   <h4 className="text-sm font-semibold mb-1">AI vs Physics Correlation</h4>
-                  <p className="text-xs text-muted-foreground">Identifying candidates where Deep Learning predictions (pIC50) strongly correlate with Physics-based docking energy.</p>
+                  <p className="text-xs text-muted-foreground">Identifying candidates where Deep Learning predictions (pIC50) strongly correlate with Physics-based docking energy (ΔG kcal/mol).</p>
                 </div>
                 <ResponsiveContainer width="100%" height={350}>
                   <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                     <XAxis dataKey="x" name="AI Predicted pIC50" type="number" stroke="var(--color-muted-foreground)" label={{ value: 'Predicted pIC50', position: 'bottom', offset: 0 }} />
-                    <YAxis dataKey="y" name="Docking Affinity" type="number" stroke="var(--color-muted-foreground)" label={{ value: 'Affinity (kcal/mol)', angle: -90, position: 'left' }} />
+                    <YAxis dataKey="y" name="Binding Energy" type="number" stroke="var(--color-muted-foreground)" label={{ value: 'ΔG (kcal/mol)', angle: -90, position: 'left' }} />
                     <Tooltip cursor={{ strokeDasharray: '3 3' }} contentStyle={{ backgroundColor: 'var(--color-card)', borderColor: 'var(--color-border)' }} />
                     <Scatter name="Compounds" data={scatterData} fill="var(--color-primary)" opacity={0.6} />
                   </ScatterChart>
