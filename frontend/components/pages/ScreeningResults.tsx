@@ -96,7 +96,7 @@ export function ScreeningResults({ onProceedToDocking }: ScreeningResultsProps) 
               <XAxis dataKey="x" type="number" name="pIC50" stroke="var(--color-muted-foreground)" />
               <YAxis dataKey="y" type="number" name="Confidence" stroke="var(--color-muted-foreground)" />
               <ZAxis dataKey="z" range={[20, 100]} name="Uncertainty" />
-              <Tooltip cursor={{strokeDasharray: '3 3'}} contentStyle={{ backgroundColor: 'var(--color-card)', borderColor: 'var(--color-border)' }} />
+              <Tooltip cursor={{strokeDasharray: '3 3'}} contentStyle={{ backgroundColor: 'var(--color-card)', borderColor: 'var(--color-border)', color: 'white' }} itemStyle={{ color: 'white' }} labelStyle={{ color: 'white' }} />
               <Scatter name="Compounds" data={scatterData} fill="var(--color-chart-2)" opacity={0.6} />
             </ScatterChart>
           </ResponsiveContainer>

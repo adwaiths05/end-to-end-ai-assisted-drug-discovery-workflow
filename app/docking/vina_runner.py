@@ -64,10 +64,10 @@ class VinaRunner:
 
             # Parse log file for binding affinity values
             energies = self._parse_vina_log(log_file)
-            best_affinity = float(energies[0]) if energies else None
+            best_energy = float(energies[0]) if energies else None
 
             return {
-                "best_affinity": best_affinity,
+                "best_energy": best_energy,
                 "energies": energies,
                 "pose_file": str(output_pdbqt)
             }

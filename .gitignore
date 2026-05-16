@@ -172,3 +172,4 @@ data/docking/*
 *.sdf
 /frontend/.next/
 /frontend/node_modules/
+test_candidates.txt

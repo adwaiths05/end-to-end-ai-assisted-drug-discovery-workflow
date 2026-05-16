@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from pathlib import Path
 
 from app.config import settings
@@ -97,18 +98,34 @@ class DockingService:
                     interactions = analyzer.analyze_pose(
                         ligand_id=comp_id,
                         smiles=smiles,
-                        affinity=result.get("best_affinity", 0),
+                        affinity=result.get("best_energy", 0),
                         pose_pdbqt=Path(result["pose_file"])
                     )
                 except Exception as int_exc:
                     LOGGER.warning(f"Interaction analysis failed for {comp_id}: {int_exc}")
+
+                # Extract Vina energies and compute Kd = exp(ΔG/RT)
+                R_KCAL = 1.98720425864083e-3  # kcal / (mol·K)
+                T_K = 298.15  # standard temperature in Kelvin
+                pose_energies = result.get("energies", [])
+                best_energy = result.get("best_energy")  # best (most negative) ΔG in kcal/mol
+
+                best_affinity_kd_uM = None
+                if best_energy is not None:
+                    try:
+                        kd_molar = math.exp(best_energy / (R_KCAL * T_K))
+                        best_affinity_kd_uM = kd_molar * 1e6  # M → μM
+                    except (OverflowError, ValueError):
+                        best_affinity_kd_uM = None
 
                 rows.append(
                     {
                         "compound_id": comp_id,
                         "smiles": smiles,
                         "predicted_pic50": predictions[index] if predictions and index < len(predictions) else None,
-                        "affinity": result.get("best_affinity"),
+                        "affinity": best_affinity_kd_uM,
+                        "best_energy_kcal": best_energy,
+                        "pose_energies": pose_energies,
                         "pose_count": self.config.n_poses,
                         "status": "success",
                         "interactions": interactions,

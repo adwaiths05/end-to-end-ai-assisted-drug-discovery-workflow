@@ -104,15 +104,17 @@ export default function AnalysisPage() {
     };
   }).sort((a, b) => (a.bestEnergyKcal ?? 0) - (b.bestEnergyKcal ?? 0)); // sort by energy (most negative first = best)
 
+  const plotResults = combinedResults.filter(r => !/^lig_\d{2,}$/.test(r.compoundId || ''));
+
   // Chart data: best affinity (Kd μM) per compound
-  const affinityChartData = combinedResults.slice(0, 10).map((r, idx) => ({
+  const affinityChartData = plotResults.slice(0, 10).map((r, idx) => ({
     name: r.compoundId || `Compound ${idx + 1}`,
     kd: r.bindingAffinityKd ?? 0,
     energy: r.bestEnergyKcal ?? 0,
   }));
 
   // Scatter: AI pIC50 vs Vina binding energy
-  const scatterData = combinedResults.map((r, idx) => ({
+  const scatterData = plotResults.map((r, idx) => ({
     x: r.predicted_pic50,
     y: r.bestEnergyKcal || 0,
     name: r.compoundId || `Compound ${idx + 1}`
@@ -225,7 +227,7 @@ export default function AnalysisPage() {
 
                 {/* Best Affinity (Kd) Bar Chart */}
                 <div className="mt-6">
-                  <h4 className="text-sm font-semibold mb-3">Best Binding Affinity (Kd) — Top 10</h4>
+                  <h4 className="text-sm font-semibold mb-3">Best Binding Affinity (Kd) — Top {affinityChartData.length}</h4>
                   <p className="text-xs text-muted-foreground mb-4">Lower Kd = stronger binding. Computed from Vina energy via Kd = exp(ΔG / RT), R = 1.987 cal/(mol·K), T = 298.15 K</p>
                   <ResponsiveContainer width="100%" height={300}>
                     <BarChart data={affinityChartData} margin={{ top: 10, right: 20, bottom: 20, left: 20 }}>
@@ -310,7 +312,7 @@ export default function AnalysisPage() {
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                     <XAxis dataKey="x" name="AI Predicted pIC50" type="number" stroke="var(--color-muted-foreground)" label={{ value: 'Predicted pIC50', position: 'bottom', offset: 0 }} />
                     <YAxis dataKey="y" name="Binding Energy" type="number" stroke="var(--color-muted-foreground)" label={{ value: 'ΔG (kcal/mol)', angle: -90, position: 'left' }} />
-                    <Tooltip cursor={{ strokeDasharray: '3 3' }} contentStyle={{ backgroundColor: 'var(--color-card)', borderColor: 'var(--color-border)' }} />
+                    <Tooltip cursor={{ strokeDasharray: '3 3' }} contentStyle={{ backgroundColor: 'var(--color-card)', borderColor: 'var(--color-border)', color: 'white' }} itemStyle={{ color: 'white' }} labelStyle={{ color: 'white' }} />
                     <Scatter name="Compounds" data={scatterData} fill="var(--color-primary)" opacity={0.6} />
                   </ScatterChart>
                 </ResponsiveContainer>

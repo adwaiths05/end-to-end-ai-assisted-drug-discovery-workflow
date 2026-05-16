@@ -67,7 +67,9 @@ class ScreeningResponse(BaseModel):
 class DockingResult(BaseModel):
     compound_id: str | None = None
     smiles: str
-    affinity: float | None = None
+    affinity: float | None = None  # Kd in μM, converted via Kd = exp(ΔG/RT)
+    best_energy_kcal: float | None = None  # Best binding energy from Vina (kcal/mol)
+    pose_energies: list[float] = Field(default_factory=list)  # All pose energies from Vina (kcal/mol)
     pose_count: int | None = None
     status: str
     details: dict[str, Any] = Field(default_factory=dict)
@@ -153,7 +155,7 @@ class PoseEnergy(BaseModel):
 class PoseDetails(BaseModel):
     ligand_id: str
     smiles: str
-    best_affinity: float
+    best_energy: float  # Best Vina binding energy (ΔG) in kcal/mol
     poses: list[PoseEnergy] = Field(default_factory=list)
     pose_file: str | None = None
 
